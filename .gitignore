@@ -1,5 +1,18 @@
+# Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 *.egg-info/
+build/
+dist/
 .pytest_cache/
+
+# Web (Vite + React)
+web/node_modules/
+web/dist/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

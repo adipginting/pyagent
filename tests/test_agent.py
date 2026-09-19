@@ -10,6 +10,7 @@ from pyagent.agent import (
     ToolResult,
     assistant_message,
 )
+from pyagent import tools
 from pyagent.llm import TextChunk, ToolCall
 
 
@@ -37,8 +38,9 @@ def test_assistant_message_with_tool_calls():
     }
 
 
-async def test_agent_loop_runs_tool_and_finishes(tmp_path):
+async def test_agent_loop_runs_tool_and_finishes(tmp_path, monkeypatch):
     """End to end with a fake provider: call a tool, then answer with text."""
+    monkeypatch.setattr(tools, "WORKSPACE", tmp_path)
     target = tmp_path / "note.txt"
     requests = []
 

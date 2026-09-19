@@ -65,10 +65,15 @@ def assistant_message(text_parts: list[str], tool_calls: list[ToolCall]) -> dict
 class AgentHarness:
     """The prompt → stream → tool-call → re-prompt loop."""
 
-    def __init__(self, stream: StreamFn, tools: list[Tool] = TOOLS) -> None:
+    def __init__(
+        self,
+        stream: StreamFn,
+        tools: list[Tool] = TOOLS,
+        history: list[dict[str, Any]] | None = None,
+    ) -> None:
         self._stream = stream
         self._tools = tools
-        self.messages: list[dict[str, Any]] = []
+        self.messages: list[dict[str, Any]] = list(history) if history else []
 
     async def run(self, prompt: str) -> AsyncIterator[Event]:
         """Drive the loop until the model stops calling tools."""

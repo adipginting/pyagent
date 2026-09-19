@@ -9,6 +9,7 @@ the wire format and is unit-tested directly.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
@@ -17,9 +18,31 @@ import httpx
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 KIMI_API_URL = "https://api.moonshot.ai/v1/chat/completions"
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 DEFAULT_MODEL = "moonshotai/kimi-k2"
 KIMI_DEFAULT_MODEL = "kimi-k2-0711-preview"
+DEEPSEEK_DEFAULT_MODEL = "deepseek-chat"
 MAX_TOKENS = 8192
+
+
+@dataclass(frozen=True)
+class Provider:
+    """One resolved provider: where to send, what key, which model."""
+
+    api_key: str
+    api_url: str
+    model: str
+
+
+def provider_from_env(model: str | None = None) -> Provider | None:
+    """Pick a provider from the environment: OpenRouter, then Kimi, then DeepSeek."""
+    if api_key := os.environ.get("OPENROUTER_API_KEY"):
+        return Provider(api_key, OPENROUTER_API_URL, model or DEFAULT_MODEL)
+    if api_key := os.environ.get("KIMI_API_KEY"):
+        return Provider(api_key, KIMI_API_URL, model or KIMI_DEFAULT_MODEL)
+    if api_key := os.environ.get("DEEPSEEK_API_KEY"):
+        return Provider(api_key, DEEPSEEK_API_URL, model or DEEPSEEK_DEFAULT_MODEL)
+    return None
 
 
 @dataclass

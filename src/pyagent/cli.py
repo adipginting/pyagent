@@ -4,20 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from functools import partial
 
 import click
 import httpx
 
 from pyagent.agent import AgentHarness, Done, TextDelta, ToolCallStarted, ToolResult
-from pyagent.llm import (
-    DEFAULT_MODEL,
-    KIMI_API_URL,
-    KIMI_DEFAULT_MODEL,
-    OPENROUTER_API_URL,
-    Usage,
-    stream_chat,
+from pyagent.llm import Usage, provider_from_env, stream_chat
+
+NO_KEY_MESSAGE = (
+    "no API key — export OPENROUTER_API_KEY (https://openrouter.ai/keys),"
+    " KIMI_API_KEY (https://platform.moonshot.ai/),"
+    " or DEEPSEEK_API_KEY (https://platform.deepseek.com/)"
 )
 
 
@@ -31,20 +29,17 @@ def main(prompt_arg: str | None, prompt_option: str | None, model: str | None) -
     if not prompt:
         raise click.UsageError('a prompt is required: pyagent "list files here"')
 
-    if api_key := os.environ.get("OPENROUTER_API_KEY"):
-        api_url = OPENROUTER_API_URL
-        model = model or DEFAULT_MODEL
-    elif api_key := os.environ.get("KIMI_API_KEY"):
-        api_url = KIMI_API_URL
-        model = model or KIMI_DEFAULT_MODEL
-    else:
-        raise click.ClickException(
-            "no API key — export OPENROUTER_API_KEY (https://openrouter.ai/keys)"
-            " or KIMI_API_KEY (https://platform.moonshot.ai/)"
-        )
+    provider = provider_from_env(model)
+    if provider is None:
+        raise click.ClickException(NO_KEY_MESSAGE)
 
     harness = AgentHarness(
-        stream=partial(stream_chat, api_key=api_key, model=model, api_url=api_url)
+        stream=partial(
+            stream_chat,
+            api_key=provider.api_key,
+            model=provider.model,
+            api_url=provider.api_url,
+        )
     )
     try:
         asyncio.run(_print_events(harness, prompt))

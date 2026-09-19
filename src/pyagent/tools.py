@@ -8,13 +8,44 @@ crash in the agent loop.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pyagent import sandbox
+
 BASH_TIMEOUT_SECONDS = 30
 MAX_OUTPUT_CHARS = 30_000
+
+# The workspace root. None means "the current directory"; set
+# PYAGENT_WORKSPACE (or assign WORKSPACE) to jail the agent elsewhere.
+WORKSPACE: Path | None = None
+
+
+def workspace() -> Path:
+    if WORKSPACE is not None:
+        return WORKSPACE.resolve()
+    override = os.environ.get("PYAGENT_WORKSPACE")
+    return Path(override).resolve() if override else Path.cwd().resolve()
+
+
+def resolve_path(path: str) -> Path:
+    """Resolve a tool path, refusing anything outside the workspace.
+
+    Relative paths are rooted at the workspace; absolute paths are allowed
+    only if they stay inside it. Symlinks are resolved first, so a link that
+    points outside is rejected too.
+    """
+    root = workspace()
+    target = Path(path)
+    if not target.is_absolute():
+        target = root / target
+    target = target.resolve()
+    if target != root and root not in target.parents:
+        raise ValueError(f"path escapes the workspace ({root}): {path}")
+    return target
 
 
 @dataclass(frozen=True)
@@ -38,7 +69,9 @@ class Tool:
 
 async def read(path: str) -> str:
     try:
-        return Path(path).read_text()
+        return resolve_path(path).read_text()
+    except ValueError as error:
+        return f"Error: {error}"
     except FileNotFoundError:
         return f"Error: no such file: {path}"
     except IsADirectoryError:
@@ -48,18 +81,35 @@ async def read(path: str) -> str:
 
 
 async def write(path: str, content: str) -> str:
-    target = Path(path)
+    try:
+        target = resolve_path(path)
+    except ValueError as error:
+        return f"Error: {error}"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
     return f"Wrote {len(content)} characters to {path}"
 
 
 async def bash(command: str) -> str:
-    process = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    """Run a shell command from the workspace directory.
+
+    Without a sandbox this pins the starting directory but cannot confine the
+    command: a shell can still reach absolute paths. Set PYAGENT_SANDBOX=1 to
+    run it under bubblewrap, where only the workspace is writable.
+    """
+    if sandbox.enabled():
+        process = await asyncio.create_subprocess_exec(
+            *sandbox.wrap(command, workspace()),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    else:
+        process = await asyncio.create_subprocess_shell(
+            command,
+            cwd=workspace(),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(), timeout=BASH_TIMEOUT_SECONDS
@@ -84,7 +134,7 @@ def _truncate(output: str) -> str:
 TOOLS: list[Tool] = [
     Tool(
         name="read",
-        description="Read a text file and return its contents.",
+        description="Read a text file in the workspace and return its contents.",
         parameters={
             "type": "object",
             "properties": {
@@ -96,7 +146,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="write",
-        description="Write content to a file, creating parent directories as needed.",
+        description="Write content to a file in the workspace, creating parent directories as needed.",
         parameters={
             "type": "object",
             "properties": {
@@ -109,7 +159,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="bash",
-        description=f"Run a shell command and return its output (times out after {BASH_TIMEOUT_SECONDS}s).",
+        description=f"Run a shell command from the workspace and return its output (times out after {BASH_TIMEOUT_SECONDS}s).",
         parameters={
             "type": "object",
             "properties": {
