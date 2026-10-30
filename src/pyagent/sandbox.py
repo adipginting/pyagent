@@ -6,9 +6,9 @@ operating system. When enabled, commands run under `bwrap`: the whole
 filesystem is mounted read-only, only the workspace is writable, and the
 process gets its own user/PID/IPC/UTS namespaces.
 
-This is opt-in because it can break commands that expect a writable home or
-`/tmp`. Enable it with `PYAGENT_SANDBOX=1`; disable network with
-`PYAGENT_SANDBOX_NET=0`.
+It is ON by default whenever `bwrap` is installed. Opt out with
+`PYAGENT_SANDBOX=0` if a command needs a writable home or `/tmp`. Disable
+network with `PYAGENT_SANDBOX_NET=0`.
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ import os
 import shutil
 from pathlib import Path
 
-TRUTHY = {"1", "true", "yes", "on"}
-
 
 def available() -> bool:
     """Is bubblewrap installed?"""
@@ -26,8 +24,15 @@ def available() -> bool:
 
 
 def enabled() -> bool:
-    """Should commands be sandboxed? Opt-in via PYAGENT_SANDBOX."""
-    return os.environ.get("PYAGENT_SANDBOX", "").lower() in TRUTHY and available()
+    """Sandbox by default when bwrap is available; opt out with PYAGENT_SANDBOX=0."""
+    if not available():
+        return False
+    return os.environ.get("PYAGENT_SANDBOX", "1").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
 
 
 def _network_on() -> bool:

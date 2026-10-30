@@ -81,3 +81,15 @@ async def test_bash_sandbox_keeps_writes_inside_workspace(tmp_path, monkeypatch)
     result = await bash(f"echo x > {outside}")
     assert "Error: timed out" not in result
     assert not outside.exists()
+
+
+def test_sandbox_enabled_by_default(monkeypatch):
+    """bwrap is used automatically when installed; no env var needed."""
+    monkeypatch.delenv("PYAGENT_SANDBOX", raising=False)
+    assert sandbox.enabled() is sandbox.available()
+
+
+def test_sandbox_can_be_disabled(monkeypatch):
+    """PYAGENT_SANDBOX=0 must opt out of the sandbox."""
+    monkeypatch.setenv("PYAGENT_SANDBOX", "0")
+    assert sandbox.enabled() is False

@@ -93,9 +93,9 @@ async def write(path: str, content: str) -> str:
 async def bash(command: str) -> str:
     """Run a shell command from the workspace directory.
 
-    Without a sandbox this pins the starting directory but cannot confine the
-    command: a shell can still reach absolute paths. Set PYAGENT_SANDBOX=1 to
-    run it under bubblewrap, where only the workspace is writable.
+    Commands run under bubblewrap when it is installed (the default), where
+    only the workspace is writable. Set PYAGENT_SANDBOX=0 to run without the
+    sandbox — useful when a command needs a writable home or /tmp.
     """
     if sandbox.enabled():
         process = await asyncio.create_subprocess_exec(

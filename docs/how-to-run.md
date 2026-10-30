@@ -77,24 +77,28 @@ PYAGENT_WORKSPACE=/path/to/repo pyagent "explain this repo"
 ```
 
 Caveat: `read`/`write` are confined, but `bash` only *starts* in the workspace
-— a shell can still reach absolute paths. For real isolation, run commands
-under an OS sandbox with [bubblewrap](https://github.com/containers/bubblewrap):
+— without an OS sandbox a shell can still reach absolute paths. When
+[bubblewrap](https://github.com/containers/bubblewrap) is installed, `bash`
+runs under it **by default**:
 
 ```bash
-# whole filesystem read-only, only the workspace writable, own namespaces
-PYAGENT_SANDBOX=1 pyagent "..."
+# default: whole filesystem read-only, only the workspace writable, own namespaces
+pyagent "..."
 
 # same, but no network access either
-PYAGENT_SANDBOX=1 PYAGENT_SANDBOX_NET=0 pyagent "..."
+PYAGENT_SANDBOX_NET=0 pyagent "..."
+
+# opt out (e.g. a command needs a writable home or /tmp)
+PYAGENT_SANDBOX=0 pyagent "..."
 ```
 
-`PYAGENT_SANDBOX=1` needs `bwrap` on `PATH` (`apt install bubblewrap`). If it
-is missing, the flag is ignored and commands run unsandboxed. The sandbox
-still allows *reading* system files; it prevents writes outside the workspace.
+The sandbox needs `bwrap` on `PATH` (`apt install bubblewrap`). If it is
+missing, commands run unsandboxed. The sandbox still allows *reading* system
+files; it prevents writes outside the workspace.
 
 ## Full isolation with Docker
 
-`PYAGENT_SANDBOX=1` jails the shell, but the Python process still runs on your
+The shell sandbox jails the shell, but the Python process still runs on your
 machine. For **process isolation**, run the whole agent in a container — the
 host is exposed only through the mounted workspace:
 

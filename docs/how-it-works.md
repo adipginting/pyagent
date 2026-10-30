@@ -87,11 +87,11 @@ to `127.0.0.1` and is a local demo, not a deployment.
 Path confinement covers the file tools, but a shell can still reach absolute
 paths, so there are two stronger layers around the harness:
 
-- **Shell sandbox (`sandbox.py`).** With `PYAGENT_SANDBOX=1`, `bash` runs under
-  [bubblewrap](https://github.com/containers/bubblewrap): the filesystem is
-  read-only, only the workspace is writable, `/tmp` is fresh, and the command
-  gets its own user/PID/IPC/UTS namespaces. `PYAGENT_SANDBOX_NET=0` also cuts
-  the network. Without `bwrap`, the flag is ignored.
+- **Shell sandbox (`sandbox.py`).** `bash` runs under
+  [bubblewrap](https://github.com/containers/bubblewrap) by default when it is
+  installed: the filesystem is read-only, only the workspace is writable,
+  `/tmp` is fresh, and the command gets its own user/PID/IPC/UTS namespaces.
+  `PYAGENT_SANDBOX_NET=0` also cuts the network; `PYAGENT_SANDBOX=0` opts out.
 - **Container (`Dockerfile`).** `make sandbox` runs the whole process in a
   container with only the workspace mounted — the Python harness included.
 

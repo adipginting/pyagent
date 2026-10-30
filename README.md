@@ -58,8 +58,9 @@ make dev                         # FastAPI :8000 + Vite :5173
 let FastAPI serve it: `make build && make api` → http://127.0.0.1:8000.
 
 > `read`/`write` are confined to `PYAGENT_WORKSPACE` (the current directory by
-> default), and shell commands can be jailed with `PYAGENT_SANDBOX=1`
-> (bubblewrap). For full process isolation, run the agent in a container with
+> default), and shell commands run under bubblewrap by default when it is
+> installed (`PYAGENT_SANDBOX=0` opts out). For full process isolation, run the
+> agent in a container with
 > `make sandbox`. Even so, it binds to `127.0.0.1` and is a demo, not something
 > to expose.
 
