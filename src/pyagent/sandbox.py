@@ -1,10 +1,15 @@
-"""Optional OS-level sandbox for the `bash` tool, built on bubblewrap.
+"""OS-level sandbox for the `bash` tool, built on bubblewrap.
 
 Path confinement (see `tools.resolve_path`) only covers `read`/`write`. A
 shell can still reach absolute paths, so real isolation has to come from the
-operating system. When enabled, commands run under `bwrap`: the whole
-filesystem is mounted read-only, only the workspace is writable, and the
-process gets its own user/PID/IPC/UTS namespaces.
+operating system. Commands run under `bwrap`: the whole filesystem is mounted
+read-only, only the workspace is writable, and the process gets its own
+user/PID/IPC/UTS namespaces.
+
+Writes are blocked everywhere outside the workspace, and a short list of
+secret-bearing paths (SSH keys, cloud credentials, shell history, ...) is
+masked so it cannot be *read* either — otherwise `cat ~/.ssh/id_rsa` would
+still work. Add your own with `PYAGENT_SANDBOX_MASK=/path:/another/path`.
 
 It is ON by default whenever `bwrap` is installed. Opt out with
 `PYAGENT_SANDBOX=0` if a command needs a writable home or `/tmp`. Disable
@@ -16,6 +21,28 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+
+# Relative to $HOME. Directories are replaced with an empty tmpfs; files are
+# bound to /dev/null. Missing paths are skipped.
+MASK_DIRS = (
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".docker",
+    ".config/gh",
+    ".config/gcloud",
+)
+MASK_FILES = (
+    ".netrc",
+    ".git-credentials",
+    ".bash_history",
+    ".zsh_history",
+    ".npmrc",
+    ".pypirc",
+    ".pgpass",
+)
+MASK_ABSOLUTE = ("/etc/shadow",)
 
 
 def available() -> bool:
@@ -44,6 +71,28 @@ def _network_on() -> bool:
     }
 
 
+def masked_paths() -> list[Path]:
+    """Paths hidden from commands: built-in secrets plus PYAGENT_SANDBOX_MASK."""
+    home = Path.home()
+    candidates = [home / rel for rel in MASK_DIRS]
+    candidates += [home / rel for rel in MASK_FILES]
+    candidates += [Path(p) for p in MASK_ABSOLUTE]
+    for extra in os.environ.get("PYAGENT_SANDBOX_MASK", "").split(":"):
+        if extra:
+            candidates.append(Path(extra).expanduser())
+    return [p for p in candidates if p.exists()]
+
+
+def _mask_args() -> list[str]:
+    args: list[str] = []
+    for path in masked_paths():
+        if path.is_dir():
+            args += ["--tmpfs", str(path)]
+        else:
+            args += ["--ro-bind", "/dev/null", str(path)]
+    return args
+
+
 def wrap(command: str, workspace: Path) -> list[str]:
     """Build the bwrap argv for running `command` from `workspace`."""
     root = str(workspace)
@@ -58,6 +107,7 @@ def wrap(command: str, workspace: Path) -> list[str]:
         "--dev-bind", "/dev", "/dev",
         "--proc", "/proc",
         "--tmpfs", "/tmp",
+        *_mask_args(),
         "--bind", root, root,
         "--chdir", root,
         "--setenv", "HOME", root,

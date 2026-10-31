@@ -92,6 +92,9 @@ paths, so there are two stronger layers around the harness:
   installed: the filesystem is read-only, only the workspace is writable,
   `/tmp` is fresh, and the command gets its own user/PID/IPC/UTS namespaces.
   `PYAGENT_SANDBOX_NET=0` also cuts the network; `PYAGENT_SANDBOX=0` opts out.
+  Secret-bearing paths (SSH keys, cloud credentials, shell history,
+  `/etc/shadow`) are masked with `--tmpfs` / `/dev/null`, so they cannot be
+  read either — otherwise `cat ~/.ssh/id_rsa` would still work.
 - **Container (`Dockerfile`).** `make sandbox` runs the whole process in a
   container with only the workspace mounted — the Python harness included.
 

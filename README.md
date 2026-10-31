@@ -59,8 +59,9 @@ let FastAPI serve it: `make build && make api` → http://127.0.0.1:8000.
 
 > `read`/`write` are confined to `PYAGENT_WORKSPACE` (the current directory by
 > default), and shell commands run under bubblewrap by default when it is
-> installed (`PYAGENT_SANDBOX=0` opts out). For full process isolation, run the
-> agent in a container with
+> installed (`PYAGENT_SANDBOX=0` opts out). Secret-bearing paths (`~/.ssh`,
+> `~/.aws`, `/etc/shadow`, ...) are masked so the shell cannot read them either.
+> For full process isolation, run the agent in a container with
 > `make sandbox`. Even so, it binds to `127.0.0.1` and is a demo, not something
 > to expose.
 

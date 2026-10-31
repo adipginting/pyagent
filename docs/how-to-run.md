@@ -93,8 +93,20 @@ PYAGENT_SANDBOX=0 pyagent "..."
 ```
 
 The sandbox needs `bwrap` on `PATH` (`apt install bubblewrap`). If it is
-missing, commands run unsandboxed. The sandbox still allows *reading* system
-files; it prevents writes outside the workspace.
+missing, commands run unsandboxed.
+
+Writes are blocked everywhere outside the workspace, and a short list of
+secret-bearing paths is masked so it cannot be read either: `~/.ssh`, `~/.aws`,
+`~/.gnupg`, `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.config/gcloud`,
+`~/.netrc`, `~/.git-credentials`, shell history, and `/etc/shadow`. Add your own
+with a colon-separated list:
+
+```bash
+PYAGENT_SANDBOX_MASK=/path/to/secrets:/another pyagent "..."
+```
+
+Everything else on the filesystem is still readable (for example `/etc/passwd`);
+masking is a denylist, not a full filesystem allowlist.
 
 ## Full isolation with Docker
 

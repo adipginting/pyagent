@@ -93,3 +93,32 @@ def test_sandbox_can_be_disabled(monkeypatch):
     """PYAGENT_SANDBOX=0 must opt out of the sandbox."""
     monkeypatch.setenv("PYAGENT_SANDBOX", "0")
     assert sandbox.enabled() is False
+
+
+def test_sandbox_masks_sensitive_paths(tmp_path, monkeypatch):
+    """~/.ssh and friends must be hidden inside the sandbox."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".ssh").mkdir()
+    (tmp_path / ".netrc").write_text("token")
+    argv = sandbox.wrap("echo hi", tmp_path)
+    joined = " ".join(argv)
+    assert f"--tmpfs {tmp_path / '.ssh'}" in joined
+    assert f"--ro-bind /dev/null {tmp_path / '.netrc'}" in joined
+
+
+def test_sandbox_mask_env_extension(tmp_path, monkeypatch):
+    """PYAGENT_SANDBOX_MASK adds extra paths."""
+    extra = tmp_path / "extra-secret"
+    extra.write_text("x")
+    monkeypatch.setenv("PYAGENT_SANDBOX_MASK", str(extra))
+    assert extra in sandbox.masked_paths()
+
+
+@pytest.mark.skipif(not sandbox.available(), reason="bwrap not installed")
+async def test_bash_cannot_read_masked_file(tmp_path, monkeypatch):
+    """A file outside the workspace is unreadable once masked."""
+    secret = tmp_path.parent / f"{tmp_path.name}-secret.txt"
+    secret.write_text("topsecret")
+    monkeypatch.setenv("PYAGENT_SANDBOX_MASK", str(secret))
+    result = await bash(f"cat {secret}")
+    assert "topsecret" not in result
